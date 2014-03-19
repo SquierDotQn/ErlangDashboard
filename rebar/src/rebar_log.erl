@@ -27,17 +27,8 @@
 -module(rebar_log).
 
 -export([init/1,
-         set_level/1,
-         error_level/0,
-         default_level/0,
-         log/3,
-         log/4,
-         is_verbose/1]).
-
--define(ERROR_LEVEL, 0).
--define(WARN_LEVEL,  1).
--define(INFO_LEVEL,  2).
--define(DEBUG_LEVEL, 3).
+         set_level/1, default_level/0,
+         log/3]).
 
 %% ===================================================================
 %% Public API
@@ -46,39 +37,35 @@
 init(Config) ->
     Verbosity = rebar_config:get_global(Config, verbose, default_level()),
     case valid_level(Verbosity) of
-        ?ERROR_LEVEL -> set_level(error);
-        ?WARN_LEVEL  -> set_level(warn);
-        ?INFO_LEVEL  -> set_level(info);
-        ?DEBUG_LEVEL -> set_level(debug)
+        0 -> set_level(error);
+        1 -> set_level(warn);
+        2 -> set_level(info);
+        3 -> set_level(debug)
     end.
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
 
 log(Level, Str, Args) ->
-    log(standard_io, Level, Str, Args).
-
-log(Device, Level, Str, Args) ->
     {ok, LogLevel} = application:get_env(rebar, log_level),
     case should_log(LogLevel, Level) of
         true ->
-            io:format(Device, log_prefix(Level) ++ Str, Args);
+            io:format(log_prefix(Level) ++ Str, Args);
         false ->
             ok
     end.
 
-error_level() -> ?ERROR_LEVEL.
-default_level() -> ?WARN_LEVEL.
-
-is_verbose(Config) ->
-    rebar_config:get_xconf(Config, is_verbose, false).
+default_level() -> error_level().
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
 valid_level(Level) ->
-    erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DEBUG_LEVEL)).
+    erlang:max(error_level(), erlang:min(Level, debug_level())).
+
+error_level() -> 0.
+debug_level() -> 3.
 
 should_log(debug, _)     -> true;
 should_log(info, debug)  -> false;
