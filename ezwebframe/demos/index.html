@@ -1,54 +1,57 @@
  <html>
    <head>
-	<script type="text/javascript" src="/common/jquery-1.7.1.min.js"></script>
-	<script type="text/javascript" src="/ezwebframe/websock.js"></script>
-	<script type="text/javascript" src="js/bootstrap.min.js"></script>
-	<link rel="stylesheet" href="./../../bootstrap.min.css" type="text/css">
-	<link rel="stylesheet" href="./style.css" type="text/css">
+     <link href="style.css" rel="stylesheet" type="text/css">
    </head>
    <body>
- 
-       <div id="header">
-	 <div id="clock">
-	   <iframe src="clocks/clock2.html" height="100" width="300"></iframe>
-	 </div>
-	 <div id="title">
-	   <h1>Erlang Project : Dashboard</h1>
-	 </div>
-       </div>
-       <div id="main">
-	 <div class="chat">
-	   <iframe src="chat/chat2.html" height="500" width="500"></iframe>
-	 </div>
-	 <div id="twitter">
-	   <li><a href="tweet/tweet.html">Tweet</a></li>
-	 </div>
-       </div>
+   	<div id=menu_connexion>
+   	  	<input id="nick_input"/>
+    	<button id="join">Connexion</button>
+    	<br/>
+    </div>
+    <div id = fenetre>
+		 <div id="header">
+		   <div id="clock">
+		 <iframe src="clocks/clock2.html" height="100" width="300"></iframe>
+		   </div>
+		   <div id="title">
+		 <h1>Erlang Project : Dashboard</h1>
+		   </div>
+		 </div>
+		 <div id="main">
+		   <div class="chat">
+		 <iframe src="chat/chat2.html" height="500" width="500"></iframe>
+		   </div>
+		   <div id="twitter">
+		 <li><a href="tweet/tweet.html">Tweet</a></li>
+		   </div>
+		 </div>
+     </div>
      </div>
      <div id="footer">
        <p>Marine BAL, Lisa BERGERON, Thomas DUBRULLE, Axel LHEUREUX, Théo PLOCKYN</p>
      </div>
    </body>
    <script>
-     $(document).ready(run);
+$(document).ready(run);
 
-     function run(){
-     $("#running").hide();
-     $("#join").click(function(){
-     var val = $("#nick_input").val();
-     $("#nick_input").val("");
-     send_json({'join':val});
-     })
-     }
-     
-     function hide_div(o){
-     $("#" + o.id).hide();
-     }
-     
-     function show_div(o){
-     $("#" + o.id).show();
-     }
-     
-     connect_to_erlang("localhost", 1456, "connexion");
-   </script>
+function run(){
+  $("#fenetre").hide();
+  $("#join").click(function(){
+      var val = $("#nick_input").val();
+      $("#nick_input").val("");
+      send_json({'join':val});
+      })
+}
+
+function hide_div(o){
+    $("#" + o.id).hide();
+}
+  
+function show_div(o){
+    $("#" + o.id).show();
+}
+
+connect_to_erlang("localhost", 1456, "connexion");
+
+</script>
  </html>
