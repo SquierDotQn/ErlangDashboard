@@ -15,8 +15,28 @@ idle(Browser) ->
 	    idle(Browser);
 	{irc, welcome, _} ->
 	    Browser ! [{cmd,hide_div},{id,menu_connexion}],
-	    Browser ! [{cmd,show_div},{id,fenetre}];
+	    Browser ! [{cmd,show_div},{id,fenetre}],
+	    idle(Browser);
 	X ->
 	    io:format("chat idle received:~p~n",[X]),
 	    idle(Browser)
     end.
+
+
+running(Browser, Who) ->
+    receive
+	{Browser,{struct, [{clicked,<<"leave">>}]}} ->
+	irc ! {leave, Who},
+	    Browser ! [{cmd,hide_div},{id,fenetre}],
+	    Browser ! [{cmd,show_div},{id,menu_connexion}],
+	    idle(Browser);
+	    X ->
+	    io:format("chat idle received:~p~n",[X]),
+	    idle(Browser)
+    end.
+
+
+
+
+
+	

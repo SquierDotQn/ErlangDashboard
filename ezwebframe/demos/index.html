@@ -1,13 +1,19 @@
  <html>
    <head>
+    <script type="text/javascript" src="/common/jquery-1.7.1.min.js"></script>
+  <script type="text/javascript" src="/ezwebframe/websock.js"></script>
      <link href="style.css" rel="stylesheet" type="text/css">
    </head>
    <body>
    	<div id=menu_connexion>
-   	  	<input id="nick_input"/>
+
+        <h1>Erlang Project : Dashboard</h1>
+   	    connexion :
+      	<input id="nick_input"/>
     	<button id="join">Connexion</button>
     	<br/>
     </div>
+
     <div id = fenetre>
 		 <div id="header">
 		   <div id="clock">
@@ -17,7 +23,9 @@
 		 <h1>Erlang Project : Dashboard</h1>
 		   </div>
 		 </div>
+
 		 <div id="main">
+       <button class="live_button" id="leave">Leave</button>
 		   <div class="chat">
 		 <iframe src="chat/chat2.html" height="500" width="500"></iframe>
 		   </div>
