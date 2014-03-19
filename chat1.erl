@@ -21,3 +21,5 @@ running(Browser, L) ->
 	    io:format("chat received:~p~n",[X])
     end,
     running(Browser, L).
+
+
