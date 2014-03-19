@@ -1,57 +1,67 @@
-<html>
-  <head>
+ <html>
+   <head>
     <script type="text/javascript" src="/common/jquery-1.7.1.min.js"></script>
-    <script type="text/javascript" src="/ezwebframe/websock.js"></script>
-    <link href="style.css" rel="stylesheet" type="text/css">
-  </head>
-  <body>
-    <div id=menu_connexion>
-      <h1>Erlang Project : Dashboard</h1>
-      <input id="nick_input"/>
-      <button id="join">Connexion</button>
-      <br/>
+  <script type="text/javascript" src="/ezwebframe/websock.js"></script>
+     <link href="style.css" rel="stylesheet" type="text/css">
+   </head>
+   <body>
+   	<div id="menu_connexion">
+
+        <h1>Erlang Project : Dashboard</h1>
+   	    connexion :
+      	<input id="nick_input"/>
+    	<button id="join">Connexion</button>
+    	<br/>
     </div>
 
-    <div id=fenetre>
-      <div id="header">
-	<div id="clock">
-	  <iframe src="clocks/clock2.html" height="100" width="300"></iframe>
-	</div>
-      </div>
-      
-      <div id="main">
-	<button class="live_button" id="leave">Leave</button>
-	<div class="chat">
-	  <iframe src="chat/chat2.html" height="500" width="500"></iframe>
-	</div>
-	<div id="twitter">
-	  <li><a href="tweet/tweet.html">Tweet</a></li>
-	</div>
-      </div>
-    </div>
-    <div id="footer">
-      <p>Marine BAL, Lisa BERGERON, Thomas DUBRULLE, Axel LHEUREUX, Théo PLOCKYN</p>
-    </div>
-  </body>
-  <script>
-    $(document).ready(run);
-    
-    function run(){
-      $("#running").hide();
-      $("#join").click(function(){
-        var val = $("#nick_input").val();
-        $("#nick_input").val("");
-        send_json({'join':val});
-      })
-    }
+    <div id ="fenetre">
+		 <div id="header">
+		   <div id="clock">
+		 <iframe src="clocks/clock2.html" height="100" width="300"></iframe>
+		   </div>
+		   <div id="title">
+		 <h1>Erlang Project : Dashboard</h1>
+		   </div>
+		 </div>
+
+		 <div id="main">
+       <button class="live_button" id="leave">Leave</button>
+		   <div class="chat">
+		 <iframe src="chat/chat2.html" height="500" width="500"></iframe>
+		   </div>
+		   <div id="twitter">
+		 <li><a href="tweet/tweet.html">Tweet</a></li>
+		   </div>
+		 </div>
+     </div>
+<div id="footer">
+  <p>Marine BAL, Lisa BERGERON, Thomas DUBRULLE, Axel LHEUREUX, Théo PLOCKYN</p>
+</div>
+</body>
+<script>
+  $(document).ready(run);
+  
+  function run(){
+  $("#fenetre").hide();
+  $("#join").click(function(){
+  var val = $("#nick_input").val();
+  $("#nick_input").val("");
+  send_json({'join':val});
+  })
+    $("#leave").click(function(){
+  var val = $("#nick_input").val();
+  $("#nick_input").val("");
+  send_json({'leave':val});
+  })
+  }
      
-    function hide_div(o){
-      $("#" + o.id).hide();  }
-    
-    function show_div(o){
-      $("#" + o.id).show();
-    }
-    
-    connect_to_erlang("localhost", 1456, "connexion");
-  </script>
+  function hide_div(o){
+  $("#" + o.id).hide();  }
+  
+  function show_div(o){
+  $("#" + o.id).show();
+  }
+  
+  connect_to_erlang("localhost", 1456, "connexion");
+   </script>
 </html>

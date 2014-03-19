@@ -10,6 +10,12 @@ start(Browser) ->
 
 idle(Browser) ->
     receive
+    	{Browser,{struct,[{clicked,<<"Leave">>}]}} ->
+    	io:format("Deco"),
+	%irc ! {leave, Who},
+	 	Browser ! [{cmd,hide_div},{id,fenetre}],
+	    Browser ! [{cmd,show_div},{id,menu_connexion}],
+	    idle(Browser); 
 	{Browser, {struct, [{join,Who}]}} ->
 	    irc ! {join, self(), Who},
 	    idle(Browser);
@@ -18,19 +24,6 @@ idle(Browser) ->
 	    Browser ! [{cmd,show_div},{id,fenetre}],
 	    idle(Browser);
 	X ->
-	    io:format("chat idle received:~p~n",[X]),
-	    idle(Browser)
-    end.
-
-
-running(Browser, Who) ->
-    receive
-	{Browser,{struct, [{clicked,<<"leave">>}]}} ->
-	irc ! {leave, Who},
-	    Browser ! [{cmd,hide_div},{id,fenetre}],
-	    Browser ! [{cmd,show_div},{id,menu_connexion}],
-	    idle(Browser);
-	    X ->
 	    io:format("chat idle received:~p~n",[X]),
 	    idle(Browser)
     end.
