@@ -1,14 +1,15 @@
 ./ezwebframe/deps/
 ./ezwebframe/ebin/
+./ezwebframe/deps/*
+./ezwebframe/ebin/*
+
 ./ezwebframe/Makefile
 ./ezwebframe/rebar
 ./ezwebframe/rebar.config
 ./ezwebframe/src/
+
 ./rebar/
+./rebar/*
 *~
-
-
-
 *.beam
 
-*.beam
