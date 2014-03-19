@@ -1,4 +1,3 @@
-<<<<<<< HEAD
  <html>
    <head>
     <script type="text/javascript" src="/common/jquery-1.7.1.min.js"></script>
@@ -6,7 +5,7 @@
      <link href="style.css" rel="stylesheet" type="text/css">
    </head>
    <body>
-   	<div id=menu_connexion>
+   	<div id="menu_connexion">
 
         <h1>Erlang Project : Dashboard</h1>
    	    connexion :
@@ -15,7 +14,7 @@
     	<br/>
     </div>
 
-    <div id = fenetre>
+    <div id ="fenetre">
 		 <div id="header">
 		   <div id="clock">
 		 <iframe src="clocks/clock2.html" height="100" width="300"></iframe>
@@ -35,34 +34,6 @@
 		   </div>
 		 </div>
      </div>
-=======
-<html>
-  <head>
-    <link href="style.css" rel="stylesheet" type="text/css">
-  </head>
-  <body>
-    <div id="menu_connexion">
-      <input id="nick_input" />
-      <button id="join">Connexion</button>
->>>>>>> FETCH_HEAD
-     </div>
-    <div id="header">
-      <div id="clock">
-	<iframe src="clocks/clock2.html" height="100" width="300"></iframe>
-      </div>
-      <div id="title">
-	<h1>Erlang Project : Dashboard</h1>
-	 </div>
-    </div>
-    <div id="main">
-      <div class="chat">
-	<iframe src="chat/chat2.html" height="500" width="500"></iframe>
-      </div>
-      <div id="twitter">
-	   <li><a href="tweet/tweet.html">Tweet</a></li>
-      </div>
-    </div>
-</div>
 <div id="footer">
   <p>Marine BAL, Lisa BERGERON, Thomas DUBRULLE, Axel LHEUREUX, Théo PLOCKYN</p>
 </div>
@@ -71,11 +42,16 @@
   $(document).ready(run);
   
   function run(){
-  $("#running").hide();
+  $("#fenetre").hide();
   $("#join").click(function(){
   var val = $("#nick_input").val();
   $("#nick_input").val("");
   send_json({'join':val});
+  })
+    $("#leave").click(function(){
+  var val = $("#nick_input").val();
+  $("#nick_input").val("");
+  send_json({'leave':val});
   })
   }
      
