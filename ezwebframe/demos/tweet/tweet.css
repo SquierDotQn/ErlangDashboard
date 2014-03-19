@@ -33,4 +33,16 @@ body {
 	border-radius: 2px;
 }
 
+#tweet {
+	box-shadow:black 0.1em 0.1em 0.1em;
+	border-radius: 2px;
+        margin-bottom: 15px;
+	background:#FFFFFF;
+}
 
+#author {
+       border-bottom: 1px solid black;
+}
+#content {
+	
+}

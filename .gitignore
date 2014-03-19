@@ -1,0 +1,9 @@
+./ezwebframe/deps/
+./ezwebframe/ebin/
+./ezwebframe/Makefile
+./ezwebframe/rebar
+./ezwebframe/rebar.config
+./ezwebframe/src/
+*~
+
+
