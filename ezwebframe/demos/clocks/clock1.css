@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 body {
 	width:70%
 }
+=======
+body {margin-left:0px; width:70%}
+>>>>>>> 29b7b2f44b0ac335bbc63043fe60a756ccb398cb
 
 pre {font-weight:bold;
         border:1px dotted blue;}
