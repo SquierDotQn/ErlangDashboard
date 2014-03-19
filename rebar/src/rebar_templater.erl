@@ -27,7 +27,6 @@
 -module(rebar_templater).
 
 -export(['create-app'/2,
-         'create-lib'/2,
          'create-node'/2,
          'list-templates'/2,
          create/2]).
@@ -50,10 +49,6 @@
 'create-app'(Config, _File) ->
     %% Alias for create w/ template=simpleapp
     create1(Config, "simpleapp").
-
-'create-lib'(Config, _File) ->
-    %% Alias for create w/ template=simplelib
-    create1(Config, "simplelib").
 
 'create-node'(Config, _File) ->
     %% Alias for create w/ template=simplenode
@@ -103,7 +98,7 @@ render(Bin, Context) ->
     ReOpts = [global, {return, list}],
     Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
     Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
-    rebar_mustache:render(Str1, Context).
+    mustache:render(Str1, Context).
 
 %% ===================================================================
 %% Internal functions
@@ -121,12 +116,6 @@ info(help, 'create-app') ->
        "~n"
        "Valid command line options:~n"
        "  [appid=myapp]~n", []);
-info(help, 'create-lib') ->
-    ?CONSOLE(
-       "Create simple lib skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [libid=mylib]~n", []);
 info(help, 'create-node') ->
     ?CONSOLE(
        "Create simple node skel.~n"
@@ -245,8 +234,7 @@ find_disk_templates(Config) ->
     HomeFiles = rebar_utils:find_files(filename:join([os:getenv("HOME"),
                                                       ".rebar", "templates"]),
                                        ?TEMPLATE_RE),
-    Recursive = rebar_config:is_recursive(Config),
-    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE, Recursive),
+    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE),
     [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].
 
 find_other_templates(Config) ->
@@ -359,10 +347,6 @@ write_file(Output, Data, Force) ->
             {error, exists}
     end.
 
-prepend_instructions(Instructions, Rest) when is_list(Instructions) ->
-    Instructions ++ Rest;
-prepend_instructions(Instruction, Rest) ->
-    [Instruction|Rest].
 
 %%
 %% Execute each instruction in a template definition file.
@@ -380,23 +364,6 @@ execute_template(_Files, [], _TemplateType, _TemplateName,
             ?ERROR("One or more files already exist on disk and "
                    "were not generated:~n~s~s", [Msg , Help])
     end;
-execute_template(Files, [{'if', Cond, True} | Rest], TemplateType,
-                 TemplateName, Context, Force, ExistingFiles) ->
-    execute_template(Files, [{'if', Cond, True, []}|Rest], TemplateType,
-                     TemplateName, Context, Force, ExistingFiles);
-execute_template(Files, [{'if', Cond, True, False} | Rest], TemplateType,
-                 TemplateName, Context, Force, ExistingFiles) ->
-    Instructions = case dict:find(Cond, Context) of
-                       {ok, true} ->
-                           True;
-                       {ok, "true"} ->
-                           True;
-                       _ ->
-                           False
-                   end,
-    execute_template(Files, prepend_instructions(Instructions, Rest),
-                     TemplateType, TemplateName, Context, Force,
-                     ExistingFiles);
 execute_template(Files, [{template, Input, Output} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
     InputName = filename:join(filename:dirname(TemplateName), Input),

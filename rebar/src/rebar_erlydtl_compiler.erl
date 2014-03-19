@@ -89,7 +89,7 @@
 %%          {doc_root, "src"}, {module_ext, "_dtl"}
 %%      ],
 %%      [
-%%          {doc_root, "templates"}, {module_ext, ""}, {source_ext, ".html"}
+%%          {doc_root, "templates", {module_ext, ""}, {source_ext, ".html"}
 %%      ]
 %%   ]}.
 -module(rebar_erlydtl_compiler).
@@ -116,8 +116,8 @@ compile(Config, _AppFile) ->
                                      option(source_ext, DtlOpts),
                                      option(out_dir, DtlOpts),
                                      option(module_ext, DtlOpts) ++ ".beam",
-                                     fun(S, T, C) ->
-                                        compile_dtl(C, S, T, DtlOpts)
+                                     fun(S, T, _C) ->
+                                        compile_dtl(S, T, DtlOpts)
                                      end,
                                      [{check_last_mod, false},
                                       {recursive, option(recursive, DtlOpts)}])
@@ -169,70 +169,57 @@ default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
 default(module_ext) -> "_dtl";
 default(custom_tags_dir) -> "";
-default(compiler_options) -> [return];
+default(compiler_options) -> [report, return];
 default(recursive) -> true.
 
-compile_dtl(Config, Source, Target, DtlOpts) ->
+compile_dtl(Source, Target, DtlOpts) ->
     case code:which(erlydtl) of
         non_existing ->
             ?ERROR("~n===============================================~n"
                    " You need to install erlydtl to compile DTL templates~n"
                    " Download the latest tarball release from github~n"
-                   "    https://github.com/erlydtl/erlydtl/releases~n"
+                   "    http://code.google.com/p/erlydtl/~n"
                    " and install it into your erlang library dir~n"
                    "===============================================~n~n", []),
             ?FAIL;
         _ ->
             case needs_compile(Source, Target, DtlOpts) of
                 true ->
-                    do_compile(Config, Source, Target, DtlOpts);
+                    do_compile(Source, Target, DtlOpts);
                 false ->
                     skipped
             end
     end.
 
-do_compile(Config, Source, Target, DtlOpts) ->
+do_compile(Source, Target, DtlOpts) ->
     %% TODO: Check last mod on target and referenced DTLs here..
-
-    %% erlydtl >= 0.8.1 does not use the extra indirection using the
-    %% compiler_options. Kept for backward compatibility with older
-    %% versions of erlydtl.
-    CompilerOptions = option(compiler_options, DtlOpts),
-
-    Sorted = proplists:unfold(
-               lists:sort(
-                 [{out_dir, option(out_dir, DtlOpts)},
-                  {doc_root, option(doc_root, DtlOpts)},
-                  {custom_tags_dir, option(custom_tags_dir, DtlOpts)},
-                  {compiler_options, CompilerOptions}
-                  |CompilerOptions])),
 
     %% ensure that doc_root and out_dir are defined,
     %% using defaults if necessary
-    Opts = lists:ukeymerge(1, DtlOpts, Sorted),
+    Opts = lists:ukeymerge(1,
+            DtlOpts,
+            lists:sort(
+                [{out_dir, option(out_dir, DtlOpts)},
+                 {doc_root, option(doc_root, DtlOpts)},
+                 {custom_tags_dir, option(custom_tags_dir, DtlOpts)},
+                 {compiler_options, option(compiler_options, DtlOpts)}])),
     ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
         [Source, Target, io_lib:format("~p", [Opts])]),
     case erlydtl:compile(Source,
                          module_name(Target),
                          Opts) of
-        ok ->
-            ok;
-        {ok, _Mod} ->
-            ok;
-        {ok, _Mod, Ws} ->
-            rebar_base_compiler:ok_tuple(Config, Source, Ws);
-        {ok, _Mod, _Bin, Ws} ->
-            rebar_base_compiler:ok_tuple(Config, Source, Ws);
-        error ->
-            rebar_base_compiler:error_tuple(Config, Source, [], [], Opts);
-        {error, {_File, _Msgs} = Error} ->
-            rebar_base_compiler:error_tuple(Config, Source, [Error], [], Opts);
-        {error, Msg} ->
-            Es = [{Source, [{erlydtl_parser, Msg}]}],
-            rebar_base_compiler:error_tuple(Config, Source, Es, [], Opts);
-        {error, Es, Ws} ->
-            rebar_base_compiler:error_tuple(Config, Source, Es, Ws, Opts)
+        ok -> ok;
+        {error, {File, [{Pos, _Mod, Err}]}} ->
+            ?ERROR("Compiling template ~p failed:~n    (~s): ~p~n",
+                [File, err_location(Pos), Err]);
+        Reason ->
+            ?ERROR("Compiling template ~s failed:~n  ~p~n",
+                   [Source, Reason]),
+            ?FAIL
     end.
+
+err_location({L,C}) -> io_lib:format("line:~w, col:~w", [L, C]);
+err_location(L)     -> io_lib:format("line:~w", [L]).
 
 module_name(Target) ->
     F = filename:basename(Target),

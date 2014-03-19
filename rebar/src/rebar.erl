@@ -87,9 +87,7 @@ run(["help"|RawCmds]) when RawCmds =/= [] ->
 run(["help"]) ->
     help();
 run(["info"|_]) ->
-    %% Catch calls to 'rebar info' to avoid treating plugins' info/2 functions
-    %% as commands.
-    ?CONSOLE("Command 'info' not understood or not applicable~n", []);
+    help();
 run(["version"]) ->
     ok = load_rebar_app(),
     %% Display vsn and build time info
@@ -180,25 +178,10 @@ run_aux(BaseConfig, Commands) ->
 %%
 help() ->
     OptSpecList = option_spec_list(),
-    rebar_getopt:usage(OptSpecList, "rebar",
-                       "[var=value,...] <command,...>",
-                       [{"var=value", "rebar global variables (e.g. force=1)"},
-                        {"command", "Command to run (e.g. compile)"}]),
-
-    ?CONSOLE("To see a list of built-in commands, execute rebar -c.~n~n", []),
-    ?CONSOLE(
-       "Type 'rebar help <CMD1> <CMD2>' for help on specific commands."
-       "~n~n", []),
-    ?CONSOLE(
-       "rebar allows you to abbreviate the command to run:~n"
-       "$ rebar co           # same as rebar compile~n"
-       "$ rebar eu           # same as rebar eunit~n"
-       "$ rebar g-d          # same as rebar get-deps~n"
-       "$ rebar x eu         # same as rebar xref eunit~n"
-       "$ rebar l-d          # same as rebar list-deps~n"
-       "$ rebar l-d l-t      # same as rebar list-deps list-templates~n"
-       "$ rebar list-d l-te  # same as rebar list-deps list-templates~n"
-       "~n", []),
+    getopt:usage(OptSpecList, "rebar",
+                 "[var=value,...] <command,...>",
+                 [{"var=value", "rebar global variables (e.g. force=1)"},
+                  {"command", "Command to run (e.g. compile)"}]),
     ?CONSOLE(
        "Core rebar.config options:~n"
        "  ~p~n"
@@ -206,10 +189,8 @@ help() ->
        "  ~p~n"
        "  ~p~n"
        "  ~p~n"
-       "  ~p~n"
        "  ~p~n",
        [
-        {recursive_cmds, []},
         {lib_dirs, []},
         {sub_dirs, ["dir1", "dir2"]},
         {plugins, [plugin1, plugin2]},
@@ -231,7 +212,7 @@ help() ->
 parse_args(RawArgs) ->
     %% Parse getopt options
     OptSpecList = option_spec_list(),
-    case rebar_getopt:parse(OptSpecList, RawArgs) of
+    case getopt:parse(OptSpecList, RawArgs) of
         {ok, Args} ->
             Args;
         {error, {Reason, Data}} ->
@@ -256,49 +237,31 @@ save_options(Config, {Options, NonOptArgs}) ->
     Config3 = rebar_config:set_xconf(Config2, keep_going,
                                      proplists:get_bool(keep_going, Options)),
 
-    %% Setup flag to enable recursive application of commands
-    Config4 = rebar_config:set_xconf(Config3, recursive,
-                                     proplists:get_bool(recursive, Options)),
-
     %% Set global variables based on getopt options
-    Config5 = set_global_flag(Config4, Options, force),
-    Config6 = case proplists:get_value(jobs, Options, ?DEFAULT_JOBS) of
+    Config4 = set_global_flag(Config3, Options, force),
+    Config5 = case proplists:get_value(jobs, Options, ?DEFAULT_JOBS) of
                   ?DEFAULT_JOBS ->
-                      Config5;
+                      Config4;
                   Jobs ->
-                      rebar_config:set_global(Config5, jobs, Jobs)
+                      rebar_config:set_global(Config4, jobs, Jobs)
               end,
 
     %% Filter all the flags (i.e. strings of form key=value) from the
     %% command line arguments. What's left will be the commands to run.
-    {Config7, RawCmds} = filter_flags(Config6, NonOptArgs, []),
-    {Config7, unabbreviate_command_names(RawCmds)}.
+    {Config6, RawCmds} = filter_flags(Config5, NonOptArgs, []),
+    {Config6, unabbreviate_command_names(RawCmds)}.
 
 %%
 %% set log level based on getopt option
 %%
 set_log_level(Config, Options) ->
-    {IsVerbose, Level} =
-        case proplists:get_bool(quiet, Options) of
-            true ->
-                {false, rebar_log:error_level()};
-            false ->
-                DefaultLevel = rebar_log:default_level(),
-                case proplists:get_all_values(verbose, Options) of
-                    [] ->
-                        {false, DefaultLevel};
-                    Verbosities ->
-                        {true, DefaultLevel + lists:last(Verbosities)}
-                end
-        end,
-
-    case IsVerbose of
-        true ->
-            Config1 = rebar_config:set_xconf(Config, is_verbose, true),
-            rebar_config:set_global(Config1, verbose, Level);
-        false ->
-            rebar_config:set_global(Config, verbose, Level)
-    end.
+    LogLevel = case proplists:get_all_values(verbose, Options) of
+                   [] ->
+                       rebar_log:default_level();
+                   Verbosities ->
+                       lists:last(Verbosities)
+               end,
+    rebar_config:set_global(Config, verbose, LogLevel).
 
 %%
 %% show version information and halt
@@ -351,57 +314,50 @@ show_info_maybe_halt(O, Opts, F) ->
 %%
 commands() ->
     S = <<"
-clean                                    Clean
-compile                                  Compile sources
+clean                                Clean
+compile                              Compile sources
 
-escriptize                               Generate escript archive
+escriptize                           Generate escript archive
 
-create      template= [var=foo,...]      Create skel based on template and vars
-create-app  [appid=myapp]                Create simple app skel
-create-lib  [libid=mylib]                Create simple lib skel
-create-node [nodeid=mynode]              Create simple node skel
-list-templates                           List available templates
+create      template= [var=foo,...]  Create skel based on template and vars
+create-app  [appid=myapp]            Create simple app skel
+create-node [nodeid=mynode]          Create simple node skel
+list-templates                       List available templates
 
-doc                                      Generate Erlang program documentation
+doc                                  Generate Erlang program documentation
 
-prepare-deps                             Run 'rebar -r get-deps compile'
-refresh-deps                             Run 'rebar -r update-deps compile'
+check-deps                           Display to be fetched dependencies
+get-deps                             Fetch dependencies
+update-deps                          Update fetched dependencies
+delete-deps                          Delete fetched dependencies
+list-deps                            List dependencies
 
-check-deps                               Display to be fetched dependencies
-get-deps                                 Fetch dependencies
-update-deps                              Update fetched dependencies
-delete-deps                              Delete fetched dependencies
-list-deps                                List dependencies
-
-generate    [dump_spec=0/1]              Build release with reltool
-overlay                                  Run reltool overlays only
+generate    [dump_spec=0/1]          Build release with reltool
+overlay                              Run reltool overlays only
 
 generate-upgrade  previous_release=path  Build an upgrade package
 
 generate-appups   previous_release=path  Generate appup files
 
-eunit       [suite[s]=foo]               Run EUnit tests in foo.erl and
-                                         test/foo_tests.erl
-            [suite[s]=foo] [test[s]=bar] Run specific EUnit tests [first test
-                                         name starting with 'bar' in foo.erl
-                                         and test/foo_tests.erl]
-            [test[s]=bar]                For every existing suite, run the first
-                                         test whose name starts with bar and, if
-                                         no such test exists, run the test whose
-                                         name starts with bar in the suite's
-                                         _tests module.
-            [random_suite_order=true]    Run tests in a random order, either
-            [random_suite_order=Seed]    with a random seed for the PRNG, or a
-                                         specific one.
+eunit       [suites=foo]             Run eunit tests in foo.erl and
+                                     test/foo_tests.erl
+            [suites=foo] [tests=bar] Run specific eunit tests [first test name
+                                     starting with 'bar' in foo.erl and
+                                     test/foo_tests.erl]
+            [tests=bar]              For every existing suite, run the first
+                                     test whose name starts with bar and, if
+                                     no such test exists, run the test whose
+                                     name starts with bar in the suite's
+                                     _tests module
 
-ct          [suite[s]=] [case=]          Run common_test suites
+ct          [suites=] [case=]        Run common_test suites
 
-qc                                       Test QuickCheck properties
+qc                                   Test QuickCheck properties
 
-xref                                     Run cross reference analysis
+xref                                 Run cross reference analysis
 
-help                                     Show the program options
-version                                  Show version information
+help                                 Show the program options
+version                              Show version information
 ">>,
     io:put_chars(S).
 
@@ -416,12 +372,12 @@ option_spec_list() ->
     JobsHelp = io_lib:format(
                  "Number of concurrent workers a command may use. Default: ~B",
                  [Jobs]),
+    VerboseHelp = "Verbosity level (-v, -vv, -vvv, --verbose 3). Default: 0",
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,     $h, "help",     undefined, "Show the program options"},
      {commands, $c, "commands", undefined, "Show available commands"},
-     {verbose,  $v, "verbose",  integer,   "Verbosity level (-v, -vv)"},
-     {quiet,    $q, "quiet",    boolean,   "Quiet, only print error messages"},
+     {verbose,  $v, "verbose",  integer,   VerboseHelp},
      {version,  $V, "version",  undefined, "Show version information"},
      {force,    $f, "force",    undefined, "Force"},
      {defines,  $D, undefined,  string,    "Define compiler macro"},
@@ -429,9 +385,7 @@ option_spec_list() ->
      {config,   $C, "config",   string,    "Rebar config file to use"},
      {profile,  $p, "profile",  undefined, "Profile this run of rebar"},
      {keep_going, $k, "keep-going", undefined,
-      "Keep running after a command fails"},
-     {recursive, $r, "recursive", boolean,
-      "Apply commands to subdirs and dependencies"}
+      "Keep running after a command fails"}
     ].
 
 %%
@@ -460,35 +414,11 @@ filter_flags(Config, [Item | Rest], Commands) ->
     end.
 
 command_names() ->
-    [
-     "check-deps",
-     "clean",
-     "compile",
-     "create",
-     "create-app",
-     "create-lib",
-     "create-node",
-     "ct",
-     "delete-deps",
-     "doc",
-     "eunit",
-     "escriptize",
-     "generate",
-     "generate-appups",
-     "generate-upgrade",
-     "get-deps",
-     "help",
-     "list-deps",
-     "list-templates",
-     "prepare-deps",
-     "qc",
-     "refresh-deps",
-     "update-deps",
-     "overlay",
-     "shell",
-     "version",
-     "xref"
-    ].
+    ["check-deps", "clean", "compile", "create", "create-app", "create-node",
+     "ct", "delete-deps", "doc", "eunit", "escriptize", "generate",
+     "generate-appups", "generate-upgrade", "get-deps", "help", "list-deps",
+     "list-templates", "qc", "update-deps", "overlay", "shell", "version",
+     "xref"].
 
 unabbreviate_command_names([]) ->
     [];

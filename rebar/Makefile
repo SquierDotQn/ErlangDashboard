@@ -8,10 +8,8 @@ all:
 
 clean:
 	@rm -rf rebar ebin/*.beam inttest/rt.work rt.work .eunit
-	@rm -f .rebarinfo
 
 distclean: clean
-	@rm -f dialyzer_warnings
 	@rm -rf deps
 
 debug:
@@ -26,7 +24,7 @@ dialyzer: dialyzer_warnings
 	@diff -U0 dialyzer_reference dialyzer_warnings
 
 dialyzer_warnings:
-	-@dialyzer -q -nn -n ebin -Wunmatched_returns -Werror_handling \
+	-@dialyzer -q -n ebin -Wunmatched_returns -Werror_handling \
 		-Wrace_conditions > dialyzer_warnings
 
 binary: VSN = $(shell ./rebar -V)
@@ -40,6 +38,6 @@ deps:
 
 test:
 	@$(REBAR) eunit
-	@$(RETEST) -v inttest
+	@$(RETEST) inttest
 
 travis: clean debug xref clean all deps test

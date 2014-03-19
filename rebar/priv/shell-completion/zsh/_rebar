@@ -7,17 +7,16 @@ _rebar_global_opts=(
   '(--help -h)'{--help,-h}'[Show the program options]'
   '(--commands -c)'{--commands,-c}'[Show available commands]'
   '(--version -V)'{--version,-V}'[Show version information]'
-  '(-vv -v)'--verbose'[Enforce verbosity level]'
-  '(-vv)-v[Slightly more verbose output]'
-  '(-v)-vv[More verbose output]'
-  '(-vv -v --verbose)'{--quiet,-q}'[Quiet, only print error messages]'
+  '(-vvv -vv -v)'--verbose+'[Verbosity level. Default: 0]:verbosity level:(0 1 2 3)'
+  '(-vvv)-v[Slightly more verbose output]'
+  '(-vvv)-vv[More verbose output]'
+  '(-v -vv)-vvv[Most verbose output]'
   '(--force -f)'{--force,-f}'[Force]'
   '-D+[Define compiler macro]'
   '(--jobs -j)'{--jobs+,-j+}'[Number of concurrent workers a command may use. Default: 3]:workers:(1 2 3 4 5 6 7 8 9)'
   '(--config -C)'{--config,-C}'[Rebar config file to use]:files:_files'
   '(--profile -p)'{--profile,-p}'[Profile this run of rebar]'
   '(--keep-going -k)'{--keep-going,-k}'[Keep running after a command fails]'
-  '(--recursive -r)'{--recursive,-r}'[Apply commands to subdirs and dependencies]'
 )
 
 _rebar () {
@@ -32,13 +31,10 @@ _rebar () {
         'compile[Compile sources]' \
         'create[Create skel based on template and vars]' \
         'create-app[Create simple app skel]' \
-        'create-lib[Create simple lib skel]' \
         'create-node[Create simple node skel]' \
         'list-template[List avaiavle templates]' \
         'doc[Generate Erlang program documentation]' \
         'check-deps[Display to be fetched dependencies]' \
-        'prepare-deps[Fetch and build dependencies]' \
-        'refresh-deps[Update and build dependencies]' \
         'get-deps[Fetch dependencies]' \
         'update-deps[Update fetched dependencies]' \
         'delete-deps[Delete fetched dependencies]' \

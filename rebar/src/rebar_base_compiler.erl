@@ -49,7 +49,7 @@ run(Config, FirstFiles, RestFiles, CompileFn) ->
             Jobs = rebar:get_jobs(Config),
             ?DEBUG("Starting ~B compile worker(s)~n", [Jobs]),
             Pids = [spawn_monitor(F) || _I <- lists:seq(1,Jobs)],
-            compile_queue(Config, Pids, RestFiles)
+            compile_queue(Pids, RestFiles)
     end.
 
 run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
@@ -139,31 +139,27 @@ compile_each([Source | Rest], Config, CompileFn) ->
         skipped ->
             ?INFO("Skipped ~s\n", [Source]);
         Error ->
-            ?CONSOLE("Compiling ~s failed:\n",
-                     [maybe_absname(Config, Source)]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p\n", [Error]),
             ?FAIL
     end,
     compile_each(Rest, Config, CompileFn).
 
-compile_queue(_Config, [], []) ->
+compile_queue([], []) ->
     ok;
-compile_queue(Config, Pids, Targets) ->
+compile_queue(Pids, Targets) ->
     receive
         {next, Worker} ->
             case Targets of
                 [] ->
                     Worker ! empty,
-                    compile_queue(Config, Pids, Targets);
+                    compile_queue(Pids, Targets);
                 [Source | Rest] ->
                     Worker ! {compile, Source},
-                    compile_queue(Config, Pids, Rest)
+                    compile_queue(Pids, Rest)
             end;
 
-        {fail, {_, {source, Source}}=Error} ->
-            ?CONSOLE("Compiling ~s failed:\n",
-                     [maybe_absname(Config, Source)]),
+        {fail, Error} ->
             maybe_report(Error),
             ?DEBUG("Worker compilation failed: ~p\n", [Error]),
             ?FAIL;
@@ -171,20 +167,20 @@ compile_queue(Config, Pids, Targets) ->
         {compiled, Source, Warnings} ->
             report(Warnings),
             ?CONSOLE("Compiled ~s\n", [Source]),
-            compile_queue(Config, Pids, Targets);
+            compile_queue(Pids, Targets);
 
         {compiled, Source} ->
             ?CONSOLE("Compiled ~s\n", [Source]),
-            compile_queue(Config, Pids, Targets);
+            compile_queue(Pids, Targets);
 
         {skipped, Source} ->
             ?INFO("Skipped ~s\n", [Source]),
-            compile_queue(Config, Pids, Targets);
+            compile_queue(Pids, Targets);
 
         {'DOWN', Mref, _, Pid, normal} ->
             ?DEBUG("Worker exited cleanly\n", []),
             Pids2 = lists:delete({Pid, Mref}, Pids),
-            compile_queue(Config, Pids2, Targets);
+            compile_queue(Pids2, Targets);
 
         {'DOWN', _Mref, _, _Pid, Info} ->
             ?DEBUG("Worker failed: ~p\n", [Info]),
@@ -206,7 +202,8 @@ compile_worker(QueuePid, Config, CompileFn) ->
                     QueuePid ! {skipped, Source},
                     compile_worker(QueuePid, Config, CompileFn);
                 Error ->
-                    QueuePid ! {fail, {{error, Error}, {source, Source}}},
+                    QueuePid ! {fail, [{error, Error},
+                                       {source, Source}]},
                     ok
             end;
 
@@ -227,10 +224,8 @@ format_warnings(Config, Source, Warnings, Opts) ->
              end,
     format_errors(Config, Source, Prefix, Warnings).
 
-maybe_report({{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}}) ->
+maybe_report([{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}]) ->
     maybe_report(ErrorsAndWarnings);
-maybe_report([{error, E}, {source, S}]) ->
-    report(["unexpected error compiling " ++ S, io_lib:fwrite("~n~p~n", [E])]);
 maybe_report({error, Es, Ws}) ->
     report(Es),
     report(Ws);
@@ -242,7 +237,12 @@ report(Messages) ->
 
 format_errors(Config, _MainSource, Extra, Errors) ->
     [begin
-         AbsSource = maybe_absname(Config, Source),
+         AbsSource = case rebar_utils:processing_base_dir(Config) of
+                         true ->
+                             Source;
+                         false ->
+                             filename:absname(Source)
+                     end,
          [format_error(AbsSource, Extra, Desc) || Desc <- Descs]
      end
      || {Source, Descs} <- Errors].
@@ -256,11 +256,3 @@ format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
 format_error(AbsSource, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
-
-maybe_absname(Config, Filename) ->
-    case rebar_utils:processing_base_dir(Config) of
-        true ->
-            Filename;
-        false ->
-            filename:absname(Filename)
-    end.
