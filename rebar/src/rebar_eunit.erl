@@ -84,7 +84,8 @@ eunit(Config, _AppFile) ->
     ok = ensure_dirs(),
     %% Save code path
     CodePath = setup_code_path(),
-    CompileOnly = rebar_config:get_global(Config, compile_only, false),
+    CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
+                                                      false),
     {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config, "eunit",
                                                      ?EUNIT_DIR),
     case CompileOnly of
@@ -120,16 +121,12 @@ info_help(Description) ->
        "  ~p~n"
        "  ~p~n"
        "Valid command line options:~n"
-       "  suite[s]=\"foo,bar\" (Run tests in foo.erl, test/foo_tests.erl and~n"
+       "  suites=\"foo,bar\" (Run tests in foo.erl, test/foo_tests.erl and~n"
        "                    tests in bar.erl, test/bar_tests.erl)~n"
-       "  test[s]=\"baz\" (For every existing suite, run the first test whose~n"
+       "  tests=\"baz\" (For every existing suite, run the first test whose~n"
        "               name starts with bar and, if no such test exists,~n"
        "               run the test whose name starts with bar in the~n"
-       "               suite's _tests module)~n"
-       "  random_suite_order=true (Run tests in random order)~n"
-       "  random_suite_order=Seed (Run tests in random order,~n"
-       "                           with the PRNG seeded with Seed)~n"
-       "  compile_only=true (Compile but do not run tests)",
+       "               suite's _tests module)~n",
        [
         Description,
         {eunit_opts, []},
@@ -153,7 +150,7 @@ run_eunit(Config, CodePath, SrcErls) ->
                         AllBeamFiles),
     OtherBeamFiles = TestBeamFiles --
         [filename:rootname(N) ++ "_tests.beam" || N <- AllBeamFiles],
-    ModuleBeamFiles = randomize_suites(Config, BeamFiles ++ OtherBeamFiles),
+    ModuleBeamFiles = BeamFiles ++ OtherBeamFiles,
 
     %% Get modules to be run in eunit
     AllModules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- AllBeamFiles],
@@ -218,7 +215,7 @@ setup_code_path() ->
 %%
 
 filter_suites(Config, Modules) ->
-    RawSuites = get_suites(Config),
+    RawSuites = rebar_config:get_global(Config, suites, ""),
     SuitesProvided = RawSuites =/= "",
     Suites = [list_to_atom(Suite) || Suite <- string:tokens(RawSuites, ",")],
     {SuitesProvided, filter_suites1(Modules, Suites)}.
@@ -226,42 +223,7 @@ filter_suites(Config, Modules) ->
 filter_suites1(Modules, []) ->
     Modules;
 filter_suites1(Modules, Suites) ->
-    [M || M <- Suites, lists:member(M, Modules)].
-
-get_suites(Config) ->
-    case rebar_config:get_global(Config, suites, "") of
-        "" ->
-            rebar_config:get_global(Config, suite, "");
-        Suites ->
-            Suites
-    end.
-
-%%
-%% == randomize suites ==
-%%
-
-randomize_suites(Config, Modules) ->
-    case rebar_config:get_global(Config, random_suite_order, undefined) of
-        undefined ->
-            Modules;
-        "true" ->
-            Seed = crypto:rand_uniform(1, 65535),
-            randomize_suites1(Modules, Seed);
-        String ->
-            try list_to_integer(String) of
-                Seed ->
-                    randomize_suites1(Modules, Seed)
-            catch
-                error:badarg ->
-                    ?ERROR("Bad random seed provided: ~p~n", [String]),
-                    ?FAIL
-            end
-    end.
-
-randomize_suites1(Modules, Seed) ->
-    _ = random:seed(35, Seed, 1337),
-    ?CONSOLE("Randomizing suite order with seed ~b~n", [Seed]),
-    [X||{_,X} <- lists:sort([{random:uniform(), M} || M <- Modules])].
+    [M || M <- Modules, lists:member(M, Suites)].
 
 %%
 %% == get matching tests ==
@@ -297,16 +259,8 @@ get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
               end,
     get_matching_tests(Config, Modules).
 
-get_tests(Config) ->
-    case rebar_config:get_global(Config, tests, "") of
-        "" ->
-            rebar_config:get_global(Config, test, "");
-        Suites ->
-            Suites
-    end.
-
 get_matching_tests(Config, Modules) ->
-    RawFunctions = get_tests(Config),
+    RawFunctions = rebar_utils:get_experimental_global(Config, tests, ""),
     Tests = [list_to_atom(F1) || F1 <- string:tokens(RawFunctions, ",")],
     case Tests of
         [] ->
@@ -454,7 +408,7 @@ perform_eunit(Config, Tests) ->
 
 get_eunit_opts(Config) ->
     %% Enable verbose in eunit if so requested..
-    BaseOpts = case rebar_log:is_verbose(Config) of
+    BaseOpts = case rebar_config:is_verbose(Config) of
                    true ->
                        [verbose];
                    false ->
@@ -607,10 +561,7 @@ align_notcovered_count(Module, Covered, NotCovered, true) ->
 
 cover_write_index(Coverage, SrcModules) ->
     {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
-    ok = file:write(F, "<!DOCTYPE HTML><html>\n"
-                        "<head><meta charset=\"utf-8\">"
-                        "<title>Coverage Summary</title></head>\n"
-                        "<body>\n"),
+    ok = file:write(F, "<html><head><title>Coverage Summary</title></head>\n"),
     IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end,
     {SrcCoverage, TestCoverage} = lists:partition(IsSrcCoverage, Coverage),
     cover_write_index_section(F, "Source", SrcCoverage),
@@ -628,7 +579,7 @@ cover_write_index_section(F, SectionName, Coverage) ->
     TotalCoverage = percentage(Covered, NotCovered),
 
     %% Write the report
-    ok = file:write(F, ?FMT("<h1>~s Summary</h1>\n", [SectionName])),
+    ok = file:write(F, ?FMT("<body><h1>~s Summary</h1>\n", [SectionName])),
     ok = file:write(F, ?FMT("<h3>Total: ~s</h3>\n", [TotalCoverage])),
     ok = file:write(F, "<table><tr><th>Module</th><th>Coverage %</th></tr>\n"),
 
@@ -715,8 +666,7 @@ reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
                  end,
              ok = application:unset_env(App, K)
          end || App <- Apps, App /= rebar,
-                {K, _V} <- application:get_all_env(App),
-                K =/= included_applications],
+                {K, _V} <- application:get_all_env(App)],
 
     reconstruct_app_env_vars(Apps),
 
@@ -848,11 +798,11 @@ pause_until_net_kernel_stopped() ->
 pause_until_net_kernel_stopped(0) ->
     exit(net_kernel_stop_failed);
 pause_until_net_kernel_stopped(N) ->
-    case node() of
-        'nonode@nohost' ->
+    try
+        timer:sleep(100),
+        pause_until_net_kernel_stopped(N - 1)
+    catch
+        error:badarg ->
             ?DEBUG("Stopped net kernel.\n", []),
-            ok;
-        _ ->
-            timer:sleep(100),
-            pause_until_net_kernel_stopped(N - 1)
+            ok
     end.

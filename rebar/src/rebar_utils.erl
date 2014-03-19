@@ -52,7 +52,6 @@
          erl_opts/1,
          src_dirs/1,
          ebin_dir/0,
-         base_dir/1,
          processing_base_dir/1, processing_base_dir/2]).
 
 -include("rebar.hrl").
@@ -109,7 +108,6 @@ sh(Command0, Options0) ->
     Command = patch_on_windows(Command0, proplists:get_value(env, Options, [])),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
-    ?DEBUG("Port Cmd: ~p\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
     case sh_loop(Port, OutputHandler, []) of
@@ -193,20 +191,20 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             %% No variables to expand
             InStr;
         _ ->
-            ReOpts = [global, unicode, {return, list}],
-            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
+            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", [global]),
             %% Use a regex to match/replace:
             %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
             RegEx = io_lib:format("\\\$(~s(\\s|$)|{~s})", [VarName, VarName]),
+            ReOpts = [global, {return, list}, unicode],
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
-vcs_vsn(Config, Vsn, Dir) ->
-    Key = {Vsn, Dir},
+vcs_vsn(Config, Vcs, Dir) ->
+    Key = {Vcs, Dir},
     Cache = rebar_config:get_xconf(Config, vsn_cache),
     case dict:find(Key, Cache) of
         error ->
-            VsnString = vcs_vsn_1(Vsn, Dir),
+            VsnString = vcs_vsn_1(Vcs, Dir),
             Cache1 = dict:store(Key, VsnString, Cache),
             Config1 = rebar_config:set_xconf(Config, vsn_cache, Cache1),
             {Config1, VsnString};
@@ -308,15 +306,12 @@ src_dirs(SrcDirs) ->
 ebin_dir() ->
     filename:join(get_cwd(), "ebin").
 
-base_dir(Config) ->
-    rebar_config:get_xconf(Config, base_dir).
-
 processing_base_dir(Config) ->
     Cwd = rebar_utils:get_cwd(),
     processing_base_dir(Config, Cwd).
 
 processing_base_dir(Config, Dir) ->
-    Dir =:= base_dir(Config).
+    Dir =:= rebar_config:get_xconf(Config, base_dir).
 
 %% ====================================================================
 %% Internal functions
@@ -445,12 +440,11 @@ emulate_escript_foldl(Fun, Acc, File) ->
 
 vcs_vsn_1(Vcs, Dir) ->
     case vcs_vsn_cmd(Vcs) of
-        {plain, VsnString} ->
+        {unknown, VsnString} ->
+            ?DEBUG("vcs_vsn: Unknown VCS atom in vsn field: ~p\n", [Vcs]),
             VsnString;
         {cmd, CmdString} ->
             vcs_vsn_invoke(CmdString, Dir);
-        unknown ->
-            ?ABORT("vcs_vsn: Unknown vsn format: ~p\n", [Vcs]);
         Cmd ->
             %% If there is a valid VCS directory in the application directory,
             %% use that version info
@@ -483,8 +477,7 @@ vcs_vsn_cmd(bzr)    -> "bzr revno";
 vcs_vsn_cmd(svn)    -> "svnversion";
 vcs_vsn_cmd(fossil) -> "fossil info";
 vcs_vsn_cmd({cmd, _Cmd}=Custom) -> Custom;
-vcs_vsn_cmd(Version) when is_list(Version) -> {plain, Version};
-vcs_vsn_cmd(_) -> unknown.
+vcs_vsn_cmd(Version) -> {unknown, Version}.
 
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),

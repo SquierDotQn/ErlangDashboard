@@ -122,43 +122,25 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
         false ->
             ?WARN("Skipping non-existent sub-dir: ~p\n", [Dir]),
             {ParentConfig, DirSet};
-        true ->
-            maybe_process_dir(Dir, ParentConfig, Command, DirSet)
-    end.
 
-maybe_process_dir(Dir, ParentConfig, Command, DirSet) ->
-    case should_cd_into_dir(Dir, ParentConfig, Command) of
         true ->
             ok = file:set_cwd(Dir),
             Config = maybe_load_local_config(Dir, ParentConfig),
 
             %% Save the current code path and then update it with
-            %% lib_dirs. Children inherit parents code path, but we also
-            %% want to ensure that we restore everything to pristine
+            %% lib_dirs. Children inherit parents code path, but we
+            %% also want to ensure that we restore everything to pristine
             %% condition after processing this child
             CurrentCodePath = update_code_path(Config),
 
-            %% Get the list of processing modules and check each one
-            %% against CWD to see if it's a fit -- if it is, use that
-            %% set of modules to process this dir.
+            %% Get the list of processing modules and check each one against
+            %% CWD to see if it's a fit -- if it is, use that set of modules
+            %% to process this dir.
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
             skip_or_process_dir(ModuleSet, Config, CurrentCodePath,
-                                Dir, Command, DirSet);
-        false ->
-            {ParentConfig, DirSet}
+                                Dir, Command, DirSet)
     end.
-
-should_cd_into_dir(Dir, Config, Command) ->
-    rebar_utils:processing_base_dir(Config, Dir) orelse
-        rebar_config:is_recursive(Config) orelse
-        is_recursive_command(Config, Command).
-
-is_recursive_command(Config, Command) ->
-    {ok, AppCmds} = application:get_env(rebar, recursive_cmds),
-    ConfCmds = rebar_config:get_local(Config, recursive_cmds, []),
-    RecursiveCmds = AppCmds ++ ConfCmds,
-    lists:member(Command, RecursiveCmds).
 
 skip_or_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
                     Dir, Command, DirSet) ->
@@ -181,13 +163,6 @@ skip_or_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
 skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
                      Dir, Command, DirSet) ->
     case rebar_app_utils:is_skipped_app(Config, AppFile) of
-        {Config1, {true, _SkippedApp}} when Command == 'update-deps' ->
-            %% update-deps does its own app skipping. Unfortunately there's no
-            %% way to signal this to rebar_core, so we have to explicitly do it
-            %% here... Otherwise if you use app=, it'll skip the toplevel
-            %% directory and nothing will be updated.
-            process_dir1(Dir, Command, DirSet, Config1,
-                         CurrentCodePath, ModuleSet);
         {Config1, {true, SkippedApp}} ->
             ?DEBUG("Skipping app: ~p~n", [SkippedApp]),
             Config2 = increment_operations(Config1),
@@ -197,9 +172,8 @@ skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
                          CurrentCodePath, ModuleSet)
     end.
 
-process_dir1(Dir, Command, DirSet, Config, CurrentCodePath,
+process_dir1(Dir, Command, DirSet, Config0, CurrentCodePath,
              {DirModules, ModuleSetFile}) ->
-    Config0 = rebar_config:set_xconf(Config, current_command, Command),
     %% Get the list of modules for "any dir". This is a catch-all list
     %% of modules that are processed in addition to modules associated
     %% with this directory type. These any_dir modules are processed
@@ -417,19 +391,18 @@ update_code_path(Config) ->
         [] ->
             no_change;
         Paths ->
+            OldPath = code:get_path(),
             LibPaths = expand_lib_dirs(Paths, rebar_utils:get_cwd(), []),
             ok = code:add_pathsa(LibPaths),
-            %% track just the paths we added, so we can remove them without
-            %% removing other paths added by this dep
-            {added, LibPaths}
+            {old, OldPath}
     end.
 
 restore_code_path(no_change) ->
     ok;
-restore_code_path({added, Paths}) ->
+restore_code_path({old, Path}) ->
     %% Verify that all of the paths still exist -- some dynamically
     %% added paths can get blown away during clean.
-    _ = [code:del_path(F) || F <- Paths, erl_prim_loader_is_file(F)],
+    true = code:set_path([F || F <- Path, erl_prim_loader_is_file(F)]),
     ok.
 
 erl_prim_loader_is_file(File) ->
@@ -439,10 +412,7 @@ expand_lib_dirs([], _Root, Acc) ->
     Acc;
 expand_lib_dirs([Dir | Rest], Root, Acc) ->
     Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
-    FqApps = case filename:pathtype(Dir) of
-                 absolute -> Apps;
-                 _        -> [filename:join([Root, A]) || A <- Apps]
-             end,
+    FqApps = [filename:join([Root, A]) || A <- Apps],
     expand_lib_dirs(Rest, Root, Acc ++ FqApps).
 
 
@@ -520,8 +490,6 @@ acc_modules([Module | Rest], Command, Config, File, Acc) ->
 %%
 plugin_modules(Config, PredirsAssoc) ->
     Modules = lists:flatten(rebar_config:get_all(Config, plugins)),
-    ?DEBUG("Plugins requested while processing ~s: ~p~n",
-           [rebar_utils:get_cwd(), Modules]),
     plugin_modules(Config, PredirsAssoc, ulist(Modules)).
 
 ulist(L) ->
@@ -562,50 +530,35 @@ plugin_modules(Config, PredirsAssoc, FoundModules, MissingModules) ->
 
 load_plugin_modules(Config, PredirsAssoc, Modules) ->
     Cwd = rebar_utils:get_cwd(),
-    PluginDirs = get_all_plugin_dirs(Config, Cwd, PredirsAssoc),
-    ?DEBUG("Plugin dirs for ~s:~n~p~n", [Cwd, PluginDirs]),
+    PluginDir = case rebar_config:get_local(Config, plugin_dir, undefined) of
+                    undefined ->
+                        filename:join(Cwd, "plugins");
+                    Dir ->
+                        Dir
+                end,
 
     %% Find relevant sources in base_dir and plugin_dir
     Erls = string:join([atom_to_list(M)++"\\.erl" || M <- Modules], "|"),
     RE = "^" ++ Erls ++ "\$",
+    BaseDir = get_plugin_base_dir(Cwd, PredirsAssoc),
     %% If a plugin is found both in base_dir and plugin_dir, the clash
     %% will provoke an error and we'll abort.
-    Sources = [rebar_utils:find_files(PD, RE, false) || PD <- PluginDirs],
+    Sources = rebar_utils:find_files(PluginDir, RE, false)
+        ++ rebar_utils:find_files(BaseDir, RE, false),
 
     %% Compile and load plugins
-    Loaded = [load_plugin(Src) || Src <- lists:append(Sources)],
+    Loaded = [load_plugin(Src) || Src <- Sources],
     FilterMissing = is_missing_plugin(Loaded),
     NotLoaded = [V || V <- Modules, FilterMissing(V)],
     {Loaded, NotLoaded}.
 
-get_all_plugin_dirs(Config, Cwd, PredirsAssoc) ->
-    [rebar_utils:get_cwd()]
-        ++ get_plugin_dir(Config, Cwd)
-        ++ get_base_plugin_dirs(Cwd, PredirsAssoc).
-
-get_plugin_dir(Config, Cwd) ->
-    case rebar_config:get_local(Config, plugin_dir, undefined) of
-        undefined ->
-            %% Plugin can be in the project's "plugins" folder
-            [filename:join(Cwd, "plugins")];
-        Dir ->
-            [Dir]
+get_plugin_base_dir(Cwd, PredirsAssoc) ->
+    case dict:find(Cwd, PredirsAssoc) of
+        {ok, BaseDir} ->
+            BaseDir;
+        error ->
+            Cwd
     end.
-
-%% We also want to include this case:
-%% Plugin can be in "plugins" directory of the plugin base directory.
-%% For example, Cwd depends on Plugin, and deps/Plugin/plugins/Plugin.erl
-%% is the plugin.
-get_base_plugin_dirs(Cwd, PredirsAssoc) ->
-    [filename:join(Dir, "plugins") ||
-        Dir <- get_plugin_base_dirs(Cwd, PredirsAssoc)].
-
-%% @doc PredirsAssoc is a dictionary of plugindir -> 'parent' pairs.
-%% 'parent' in this case depends on plugin; therefore we have to give
-%% all plugins that Cwd ('parent' in this case) depends on.
-get_plugin_base_dirs(Cwd, PredirsAssoc) ->
-    [PluginDir || {PluginDir, Master} <- dict:to_list(PredirsAssoc),
-                  Master =:= Cwd].
 
 is_missing_plugin(Loaded) ->
     fun(Mod) -> not lists:member(Mod, Loaded) end.
