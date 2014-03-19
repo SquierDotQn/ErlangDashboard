@@ -1,15 +1,21 @@
 ./ezwebframe/deps/
 ./ezwebframe/ebin/
+./ezwebframe/deps/*
+./ezwebframe/ebin/*
+
 ./ezwebframe/Makefile
 ./ezwebframe/rebar
 ./ezwebframe/rebar.config
 ./ezwebframe/src/
+
+./rebar/
+./rebar/*
 *~
+*.beam
 
-
-
+<<<<<<< HEAD
 *.beam
 
 *.beam
-
-*.beam
+=======
+>>>>>>> 5798745e3940b87953297480c041c93bf11dc5fc
