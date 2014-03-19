@@ -4,6 +4,7 @@
 ./ezwebframe/rebar
 ./ezwebframe/rebar.config
 ./ezwebframe/src/
+./rebar/
 *~
 
 
