@@ -12,10 +12,10 @@ running(Browser, L) ->
 	    L1 = [Who,"<br>"|L],
 	    Browser ! [{cmd,fill_div}, {id,users},
 		       {txt, list_to_binary(L1)}],
-	    running(Browser, L1);
+	    running(Browser, Who);
 	{Browser,{struct, [{entry,<<"tell">>},{txt,Txt}]}} ->
 	    Browser ! [{cmd, append_div}, {id,scroll},
-		       {txt,list_to_binary([" > ", Txt, "<br>"])}],
+		       {txt,list_to_binary([Who," > ", Txt, "<br>"])}],
 	    running(Browser, L);
 	X ->
 	    io:format("chat received:~p~n",[X])

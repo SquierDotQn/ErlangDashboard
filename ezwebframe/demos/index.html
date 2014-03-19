@@ -10,6 +10,7 @@
         <h1>Erlang Project : Dashboard</h1>
    	    connexion :
       	<input id="nick_input"/>
+          <input id="mdp_input"/>
     	<button id="join">Connexion</button>
     	<br/>
     </div>
@@ -29,8 +30,10 @@
 		   <div class="chat">
 		 <iframe src="chat/chat2.html" height="500" width="500"></iframe>
 		   </div>
+
 		   <div id="twitter">
-		 <li><a href="tweet/tweet.html">Tweet</a></li>
+<iframe src="tweet/tweet.html" height="500" width="500"></iframe>		 
+     <li><a href="tweet/tweet.html">Tweet</a></li>
 		   </div>
 		 </div>
      </div>
@@ -45,7 +48,7 @@
   $("#fenetre").hide();
   $("#join").click(function(){
   var val = $("#nick_input").val();
-  $("#nick_input").val("");
+  /*$("#nick_input").val("");*/
   send_json({'join':val});
   })
     $("#leave").click(function(){

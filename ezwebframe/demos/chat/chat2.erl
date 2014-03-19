@@ -27,11 +27,6 @@ running(Browser, Who) ->
 	{Browser,{struct, [{entry,<<"tell">>},{txt,Txt}]}} ->
 	    irc ! {broadcast, Who, Txt},
 	    running(Browser, Who);
-	{Browser,{struct, [{clicked,<<"Leave">>}]}} ->
-	    irc ! {leave, Who},
-	    Browser ! [{cmd,hide_div},{id,running}],
-	    Browser ! [{cmd,show_div},{id,idle}],
-	    idle(Browser);
 	{irc, scroll, Bin} ->
 	    Browser ! [{cmd,append_div},{id,scroll}, {txt, Bin}],	    
 	    running(Browser, Who);
